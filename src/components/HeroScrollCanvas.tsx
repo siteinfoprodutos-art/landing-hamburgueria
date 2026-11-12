@@ -1,298 +1,419 @@
-import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, MessageCircle } from 'lucide-react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
+import { ChevronDown, Clock, Flame, MessageCircle, Phone, ShieldCheck, Sparkles } from 'lucide-react';
 import { STORE_INFO } from '../data/menu';
 import { BrasaLogo } from './BurgerArtwork';
 
-const TOTAL_FRAMES = 95;
+const CFG = {
+  desktop: {
+    key: 'desktop' as const,
+    dir: '/frames/',
+    total: 95,
+    mode: 'cover' as const,
+    scale: 1,
+  },
+  mobile: {
+    key: 'mobile' as const,
+    dir: '/frames_mobile/',
+    total: 72,
+    mode: 'fit' as const,
+    scale: 1.4,
+  },
+} as const;
 
-interface DebugInfo {
-  progress: number;
+type HeroCfg = (typeof CFG)[keyof typeof CFG];
+type PhaseId = 1 | 2 | 3 | 4;
+
+interface DebugSnapshot {
+  modeKey: HeroCfg['key'];
+  drawMode: HeroCfg['mode'];
+  scale: number;
+  dir: string;
+  total: number;
   currentFrame: number;
-  targetFrame: number;
-  loadedCount: number;
-  failedCount: number;
-  rectTop: number;
-  isMobile: boolean;
+  progress: number;
+  loaded: number;
+  errors: number;
 }
 
+const EMBER_PARTICLES = [
+  { left: '14%', bottom: '18%', size: 4, duration: '5.5s', delay: '0s' },
+  { left: '26%', bottom: '24%', size: 3, duration: '7.2s', delay: '1.1s' },
+  { left: '38%', bottom: '12%', size: 5, duration: '6.1s', delay: '0.4s' },
+  { left: '49%', bottom: '20%', size: 3, duration: '5.8s', delay: '2.2s' },
+  { left: '61%', bottom: '15%', size: 4, duration: '6.8s', delay: '0.8s' },
+  { left: '72%', bottom: '26%', size: 3, duration: '5.2s', delay: '1.7s' },
+  { left: '84%', bottom: '19%', size: 4, duration: '6.4s', delay: '2.9s' },
+  { left: '20%', bottom: '36%', size: 3, duration: '7.0s', delay: '3.4s' },
+  { left: '55%', bottom: '34%', size: 4, duration: '5.9s', delay: '1.5s' },
+  { left: '79%', bottom: '38%', size: 3, duration: '6.6s', delay: '0.6s' },
+] as const;
+
+const PHASE_COPY: Record<
+  PhaseId,
+  {
+    desktopBadge: string;
+    titleStart: string;
+    titleHighlight: string;
+    highlightTone: 'primary' | 'cheese';
+    subtitle: string;
+  }
+> = {
+  1: {
+    desktopBadge: 'Desde 2025 · Caieiras-SP',
+    titleStart: 'O HAMBÚRGUER QUE ',
+    titleHighlight: 'VOCÊ MERECE',
+    highlightTone: 'primary',
+    subtitle:
+      'Blend bovino artesanal de 150g grelhado na brasa quente, queijo derretido e pão brioche tostado na manteiga.',
+  },
+  2: {
+    desktopBadge: 'Sabor autêntico na brasa',
+    titleStart: 'BLEND ARTESANAL ',
+    titleHighlight: '150G',
+    highlightTone: 'cheese',
+    subtitle:
+      '150g de carne bovina selada na grelha bem quente com tempero especial da casa e suculência incomparável.',
+  },
+  3: {
+    desktopBadge: 'Crocância e maciez incomparáveis',
+    titleStart: 'PÃO BRIOCHE TOSTADO ',
+    titleHighlight: 'NA MANTEIGA',
+    highlightTone: 'primary',
+    subtitle:
+      'Pão brioche macio, fofinho e dourado na chapa com manteiga de garrafa para selar todo o sabor.',
+  },
+  4: {
+    desktopBadge: 'Diretamente para sua casa',
+    titleStart: 'FEITO NA HORA, ',
+    titleHighlight: 'ENTREGUE QUENTE',
+    highlightTone: 'cheese',
+    subtitle:
+      'Entregas rápidas no bairro Laranjeiras e em toda Caieiras-SP. Peça agora pelo iFood, WhatsApp ou telefone!',
+  },
+};
+
+const pad = (n: number) => String(n).padStart(3, '0');
+
 export function HeroScrollCanvas() {
-  const sectionRef = useRef<HTMLElement | null>(null);
+  const heroRef = useRef<HTMLElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Cached frame images / bitmaps
-  const frameImagesRef = useRef<(HTMLImageElement | ImageBitmap | null)[]>(
-    new Array(TOTAL_FRAMES).fill(null)
-  );
-
-  // Loading states
+  const [modeKey, setModeKey] = useState<HeroCfg['key']>(() => {
+    if (typeof window === 'undefined') return 'desktop';
+    return window.matchMedia('(max-width: 768px)').matches ? 'mobile' : 'desktop';
+  });
+  const [activePhase, setActivePhase] = useState<PhaseId>(1);
+  const [scrollProgress, setScrollProgress] = useState(0);
   const [loadedPercent, setLoadedPercent] = useState(0);
   const [isPreloaded, setIsPreloaded] = useState(false);
 
-  // Debug HUD mode (?debug=1)
-  const [isDebug, setIsDebug] = useState(false);
-  const [debugData, setDebugData] = useState<DebugInfo>({
-    progress: 0,
-    currentFrame: 1,
-    targetFrame: 1,
-    loadedCount: 0,
-    failedCount: 0,
-    rectTop: 0,
-    isMobile: false,
+  const [isDebug] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('debug') === '1';
   });
 
-  // Progress Lerp refs (target index & lerp ~0.15)
-  const targetProgressRef = useRef(0);
-  const currentProgressRef = useRef(0);
-  const lastDrawnFrameRef = useRef(-1);
+  const [debugInfo, setDebugInfo] = useState<DebugSnapshot>(() => {
+    const initialCfg =
+      typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
+        ? CFG.mobile
+        : CFG.desktop;
+    return {
+      modeKey: initialCfg.key,
+      drawMode: initialCfg.mode,
+      scale: initialCfg.scale,
+      dir: initialCfg.dir,
+      total: initialCfg.total,
+      currentFrame: 1,
+      progress: 0,
+      loaded: 0,
+      errors: 0,
+    };
+  });
 
-  // Active Text Phase (1, 2, 3, 4)
-  const [activePhase, setActivePhase] = useState<1 | 2 | 3 | 4>(1);
-
-  // Check URL debug parameter ?debug=1
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      setIsDebug(params.get('debug') === '1');
-    }
-  }, []);
+    const heroNode = heroRef.current;
+    const canvasNode = canvasRef.current;
+    if (!heroNode || !canvasNode) return;
 
-  // Preload 95 WebP Frames - Unmasks page immediately once frame 1 is ready!
-  useEffect(() => {
-    let cancelled = false;
-    const isMobile = window.innerWidth < 640;
+    const context = canvasNode.getContext('2d');
+    if (!context) return;
 
+    const hero: HTMLElement = heroNode;
+    const canvas: HTMLCanvasElement = canvasNode;
+    const ctx: CanvasRenderingContext2D = context;
+
+    const mq = window.matchMedia('(max-width: 768px)');
+    let cfg: HeroCfg = mq.matches ? CFG.mobile : CFG.desktop;
+    let frames: (HTMLImageElement | null)[] = [];
+    let current = 0;
+    let target = 0;
+    let lastIdx = -1;
+
+    let loadVersion = 0;
     let loadedCount = 0;
-    let failedCount = 0;
-
-    // Load Frame 1 immediately and release preloader
-    const firstImg = new Image();
-    firstImg.src = '/frames/frame_001.webp';
-    firstImg.onload = () => {
-      if (!cancelled) {
-        frameImagesRef.current[0] = firstImg;
-        setIsPreloaded(true); // Immediate unmask for instant scroll responsiveness
-      }
-    };
-    firstImg.onerror = () => {
-      if (!cancelled) setIsPreloaded(true);
-    };
-
-    // 1.5s safety timeout to release page regardless
-    const safetyTimeout = setTimeout(() => {
-      if (!cancelled) setIsPreloaded(true);
-    }, 1500);
-
-    // Load remaining frames in background
-    const framesToLoad = Array.from({ length: TOTAL_FRAMES }, (_, i) => i).filter(
-      (i) => i === 0 || !isMobile || i % 2 === 0
-    );
-    const totalToLoad = framesToLoad.length;
-
-    framesToLoad.forEach((i) => {
-      const frameNum = i + 1;
-      const padded = String(frameNum).padStart(3, '0');
-      const src = `/frames/frame_${padded}.webp`;
-
-      const img = new Image();
-      img.src = src;
-
-      img.onload = () => {
-        if (cancelled) return;
-        if ('createImageBitmap' in window) {
-          createImageBitmap(img)
-            .then((bmp) => {
-              if (!cancelled) frameImagesRef.current[i] = bmp;
-            })
-            .catch(() => {
-              if (!cancelled) frameImagesRef.current[i] = img;
-            })
-            .finally(() => {
-              loadedCount++;
-              setLoadedPercent(Math.min(100, Math.round((loadedCount / totalToLoad) * 100)));
-            });
-        } else {
-          frameImagesRef.current[i] = img;
-          loadedCount++;
-          setLoadedPercent(Math.min(100, Math.round((loadedCount / totalToLoad) * 100)));
-        }
-      };
-
-      img.onerror = () => {
-        // Fallback to JPG
-        const jpgImg = new Image();
-        jpgImg.src = `/frames/frame_${padded}.jpg`;
-        jpgImg.onload = () => {
-          if (cancelled) return;
-          frameImagesRef.current[i] = jpgImg;
-          loadedCount++;
-          setLoadedPercent(Math.min(100, Math.round((loadedCount / totalToLoad) * 100)));
-        };
-        jpgImg.onerror = () => {
-          failedCount++;
-        };
-      };
-    });
-
-    return () => {
-      cancelled = true;
-      clearTimeout(safetyTimeout);
-    };
-  }, []);
-
-  // Main Canvas animation & real-time scroll evaluation loop (rAF)
-  useEffect(() => {
+    let errorCount = 0;
+    let settledCount = 0;
+    let safetyTimer: ReturnType<typeof setTimeout> | null = null;
     let rafId = 0;
+    let disposed = false;
 
-    const renderLoop = () => {
-      const hero = sectionRef.current;
-      if (hero) {
-        const rect = hero.getBoundingClientRect();
-        const windowH = window.innerHeight || 800;
-        const totalScrollable = Math.max(hero.offsetHeight - windowH, 1);
-        const rawProgress = -rect.top / totalScrollable;
-        const clampedProgress = Math.min(Math.max(rawProgress, 0), 1);
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-        targetProgressRef.current = clampedProgress;
+    function getProgress(): number {
+      const r = hero.getBoundingClientRect();
+      const max = hero.offsetHeight - window.innerHeight;
+      if (max <= 0) return 0;
+      return Math.min(1, Math.max(0, -r.top / max));
+    }
 
-        // Determine active text phase
-        let phase: 1 | 2 | 3 | 4 = 1;
-        if (clampedProgress < 0.25) phase = 1;
-        else if (clampedProgress < 0.5) phase = 2;
-        else if (clampedProgress < 0.75) phase = 3;
-        else phase = 4;
+    function draw(i: number) {
+      const cw = canvas.width;
+      const ch = canvas.height;
+      if (cw <= 0 || ch <= 0) return;
 
-        setActivePhase((prev) => (prev !== phase ? phase : prev));
-      }
+      ctx.fillStyle = '#0A0A0A';
+      ctx.fillRect(0, 0, cw, ch);
 
-      // Lerp current progress smoothly (~0.15 speed)
-      currentProgressRef.current +=
-        (targetProgressRef.current - currentProgressRef.current) * 0.15;
-
-      const curProg = currentProgressRef.current;
-      const targetFrameIdx = Math.min(
-        TOTAL_FRAMES - 1,
-        Math.max(0, Math.round(curProg * (TOTAL_FRAMES - 1)))
-      );
-
-      const canvas = canvasRef.current;
-      if (canvas) {
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          const dpr = Math.min(window.devicePixelRatio || 1, 2);
-          const cw = canvas.clientWidth || window.innerWidth;
-          const ch = canvas.clientHeight || window.innerHeight;
-
-          const targetW = Math.round(cw * dpr);
-          const targetH = Math.round(ch * dpr);
-
-          if (canvas.width !== targetW || canvas.height !== targetH) {
-            canvas.width = targetW;
-            canvas.height = targetH;
-            lastDrawnFrameRef.current = -1; // Force redraw on resize
+      // Find exact frame or nearest loaded frame during initial streaming
+      let img = frames[i];
+      if (!img || !img.complete || img.naturalWidth === 0) {
+        for (let offset = 1; offset < cfg.total; offset++) {
+          const prev = frames[i - offset];
+          if (prev && prev.complete && prev.naturalWidth > 0) {
+            img = prev;
+            break;
           }
-
-          // Draw frame when frame index changes or canvas resizes
-          if (lastDrawnFrameRef.current !== targetFrameIdx) {
-            lastDrawnFrameRef.current = targetFrameIdx;
-
-            ctx.save();
-            ctx.scale(dpr, dpr);
-            ctx.fillStyle = '#0A0A0A';
-            ctx.fillRect(0, 0, cw, ch);
-
-            // Subtle ember glow background
-            const glow = ctx.createRadialGradient(
-              cw * (cw > 768 ? 0.62 : 0.5),
-              ch * 0.5,
-              cw * 0.05,
-              cw * (cw > 768 ? 0.62 : 0.5),
-              ch * 0.5,
-              Math.max(cw, ch) * 0.55
-            );
-            glow.addColorStop(0, 'rgba(244, 123, 32, 0.22)');
-            glow.addColorStop(0.45, 'rgba(232, 48, 42, 0.08)');
-            glow.addColorStop(1, 'rgba(10, 10, 10, 0)');
-            ctx.fillStyle = glow;
-            ctx.fillRect(0, 0, cw, ch);
-
-            // Find best available frame
-            let frameImg = frameImagesRef.current[targetFrameIdx];
-            if (!frameImg) {
-              const nearestIdx = targetFrameIdx - (targetFrameIdx % 2);
-              frameImg =
-                frameImagesRef.current[nearestIdx] ||
-                frameImagesRef.current.find(Boolean) ||
-                null;
-            }
-
-            if (frameImg) {
-              const iw = frameImg.width || 1280;
-              const ih = frameImg.height || 720;
-              const isMobile = cw < 640;
-
-              let scale = Math.max(cw / iw, ch / ih);
-              if (isMobile) {
-                scale *= 1.15; // Mobile centered zoom
-              }
-
-              const dw = iw * scale;
-              const dh = ih * scale;
-              const dx = (cw - dw) / 2;
-              const dy = (ch - dh) / 2;
-
-              ctx.drawImage(frameImg, dx, dy, dw, dh);
-            }
-
-            // Scrim overlay on left for high contrast text readability
-            const scrimW = cw > 768 ? cw * 0.6 : cw;
-            const leftScrim = ctx.createLinearGradient(0, 0, scrimW, 0);
-            leftScrim.addColorStop(0, 'rgba(10, 10, 10, 0.94)');
-            leftScrim.addColorStop(0.6, 'rgba(10, 10, 10, 0.76)');
-            leftScrim.addColorStop(1, 'rgba(10, 10, 10, 0.1)');
-            ctx.fillStyle = leftScrim;
-            ctx.fillRect(0, 0, scrimW, ch);
-
-            ctx.restore();
+          const next = frames[i + offset];
+          if (next && next.complete && next.naturalWidth > 0) {
+            img = next;
+            break;
           }
         }
       }
+      if (!img || !img.complete || img.naturalWidth === 0) return;
 
-      // Debug HUD update
-      if (isDebug && sectionRef.current) {
-        const hero = sectionRef.current;
-        const rect = hero.getBoundingClientRect();
-        setDebugData({
-          progress: Number(curProg.toFixed(3)),
-          currentFrame: targetFrameIdx + 1,
-          targetFrame: Math.round(targetProgressRef.current * (TOTAL_FRAMES - 1)) + 1,
-          loadedCount: frameImagesRef.current.filter(Boolean).length,
-          failedCount: TOTAL_FRAMES - frameImagesRef.current.filter(Boolean).length,
-          rectTop: Math.round(rect.top),
-          isMobile: window.innerWidth < 640,
+      const iw = img.naturalWidth;
+      const ih = img.naturalHeight;
+      const s =
+        cfg.mode === 'cover'
+          ? Math.max(cw / iw, ch / ih)
+          : (cw / iw) * cfg.scale;
+      const w = iw * s;
+      const h = ih * s;
+      const x = (cw - w) / 2;
+      const y = cfg.mode === 'cover' ? (ch - h) / 2 : ch * 0.5 - h / 2;
+
+      ctx.drawImage(img, x, y, w, h);
+
+      // Soft top/bottom edge melt in fit mode so the 16:9 frame blends smoothly into #0A0A0A
+      if (cfg.mode === 'fit') {
+        const fade = Math.max(20, Math.round(h * 0.14));
+        const topFade = ctx.createLinearGradient(0, y, 0, y + fade);
+        topFade.addColorStop(0, 'rgba(10, 10, 10, 1)');
+        topFade.addColorStop(1, 'rgba(10, 10, 10, 0)');
+        ctx.fillStyle = topFade;
+        ctx.fillRect(0, y - 2, cw, fade + 2);
+
+        const botFade = ctx.createLinearGradient(0, y + h - fade, 0, y + h);
+        botFade.addColorStop(0, 'rgba(10, 10, 10, 0)');
+        botFade.addColorStop(1, 'rgba(10, 10, 10, 1)');
+        ctx.fillStyle = botFade;
+        ctx.fillRect(0, y + h - fade, cw, fade + 2);
+      }
+    }
+
+    function resizeCanvas() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const rect = canvas.getBoundingClientRect();
+      const targetW = Math.max(1, Math.round(rect.width * dpr));
+      const targetH = Math.max(1, Math.round(rect.height * dpr));
+      if (canvas.width !== targetW || canvas.height !== targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+      }
+      const idx = Math.min(cfg.total - 1, Math.max(0, Math.round(current)));
+      draw(idx);
+      lastIdx = idx;
+    }
+
+    function updateTexts(progress: number) {
+      const nextPhase: PhaseId =
+        progress < 0.25 ? 1 : progress < 0.5 ? 2 : progress < 0.75 ? 3 : 4;
+      setActivePhase((prev) => (prev !== nextPhase ? nextPhase : prev));
+      setScrollProgress((prev) => (Math.abs(prev - progress) > 0.004 ? progress : prev));
+    }
+
+    function loadSequence(nextCfg: HeroCfg) {
+      if (safetyTimer) {
+        clearTimeout(safetyTimer);
+        safetyTimer = null;
+      }
+
+      loadVersion += 1;
+      const myVersion = loadVersion;
+
+      cfg = nextCfg;
+      setModeKey(cfg.key);
+
+      // Isolated array per active sequence — never shared between desktop and mobile
+      frames = new Array<HTMLImageElement | null>(cfg.total).fill(null);
+      current = 0;
+      target = getProgress() * (cfg.total - 1);
+      lastIdx = -1;
+      loadedCount = 0;
+      errorCount = 0;
+      settledCount = 0;
+
+      setLoadedPercent(0);
+      setIsPreloaded(false);
+
+      const threshold90 = Math.ceil(cfg.total * 0.9);
+
+      safetyTimer = setTimeout(() => {
+        if (disposed || myVersion !== loadVersion) return;
+        setIsPreloaded(true);
+        resizeCanvas();
+      }, 8000);
+
+      const loadPromises = Array.from({ length: cfg.total }, (_, idx) => {
+        return new Promise<void>((resolve) => {
+          const img = new Image();
+          const frameNumber = idx + 1;
+          img.src = `${cfg.dir}frame_${pad(frameNumber)}.webp`;
+
+          const onDone = (ok: boolean) => {
+            if (disposed || myVersion !== loadVersion) {
+              resolve();
+              return;
+            }
+            settledCount += 1;
+            if (ok) {
+              loadedCount += 1;
+              frames[idx] = img;
+              const wantedIdx = Math.min(cfg.total - 1, Math.max(0, Math.round(current)));
+              if (idx === wantedIdx || lastIdx === -1) {
+                draw(wantedIdx);
+                lastIdx = wantedIdx;
+              }
+            } else {
+              errorCount += 1;
+            }
+
+            const pct = Math.min(100, Math.round((settledCount / cfg.total) * 100));
+            setLoadedPercent(pct);
+
+            if (settledCount >= threshold90) {
+              setIsPreloaded(true);
+            }
+            resolve();
+          };
+
+          img.onload = () => onDone(true);
+          img.onerror = () => onDone(false);
+        });
+      });
+
+      void Promise.allSettled(loadPromises).then(() => {
+        if (disposed || myVersion !== loadVersion) return;
+        if (safetyTimer) {
+          clearTimeout(safetyTimer);
+          safetyTimer = null;
+        }
+        setIsPreloaded(true);
+        const wantedIdx = Math.min(cfg.total - 1, Math.max(0, Math.round(current)));
+        draw(wantedIdx);
+        lastIdx = wantedIdx;
+      });
+    }
+
+    function tick() {
+      if (disposed) return;
+
+      const p = getProgress();
+      target = p * (cfg.total - 1);
+      if (prefersReducedMotion) {
+        current = target;
+      } else {
+        current += (target - current) * 0.12;
+      }
+
+      const idx = Math.min(cfg.total - 1, Math.max(0, Math.round(current)));
+      if (idx !== lastIdx) {
+        draw(idx);
+        lastIdx = idx;
+      }
+
+      updateTexts(p);
+
+      if (isDebug) {
+        setDebugInfo({
+          modeKey: cfg.key,
+          drawMode: cfg.mode,
+          scale: cfg.scale,
+          dir: cfg.dir,
+          total: cfg.total,
+          currentFrame: idx + 1,
+          progress: Number(p.toFixed(3)),
+          loaded: loadedCount,
+          errors: errorCount,
         });
       }
 
-      rafId = requestAnimationFrame(renderLoop);
+      rafId = requestAnimationFrame(tick);
+    }
+
+    const handleMediaChange = (e: MediaQueryListEvent) => {
+      const nextCfg = e.matches ? CFG.mobile : CFG.desktop;
+      loadSequence(nextCfg);
+      resizeCanvas();
     };
 
-    rafId = requestAnimationFrame(renderLoop);
-    return () => cancelAnimationFrame(rafId);
+    const handleResize = () => {
+      resizeCanvas();
+    };
+
+    resizeCanvas();
+    loadSequence(cfg);
+    updateTexts(getProgress());
+    rafId = requestAnimationFrame(tick);
+
+    mq.addEventListener('change', handleMediaChange);
+    window.addEventListener('resize', handleResize, { passive: true });
+    window.addEventListener('orientationchange', handleResize, { passive: true });
+
+    return () => {
+      disposed = true;
+      cancelAnimationFrame(rafId);
+      if (safetyTimer) clearTimeout(safetyTimer);
+      mq.removeEventListener('change', handleMediaChange);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
   }, [isDebug]);
 
-  const scrollRatio = targetProgressRef.current;
+  const isMobile = modeKey === 'mobile';
+  const phaseIds: PhaseId[] = [1, 2, 3, 4];
 
   return (
     <section
       id="hero"
-      ref={sectionRef}
+      ref={heroRef}
       style={{ height: '500vh', position: 'relative' }}
       aria-label="Apresentação do hambúrguer artesanal BRASA BURGER"
     >
+      <span id="inicio" className="absolute top-0 left-0" aria-hidden="true" />
+
       <div
         className="stage"
-        style={{ position: 'sticky', top: 0, height: '100vh', overflow: 'hidden', background: '#0A0A0A' }}
+        style={{
+          position: 'sticky',
+          top: 0,
+          height: '100svh',
+          overflow: 'hidden',
+          background: '#0A0A0A',
+        }}
       >
-        {/* Fullscreen Canvas */}
+        {/* Scroll Canvas */}
         <canvas
           id="heroCanvas"
           ref={canvasRef}
@@ -300,33 +421,103 @@ export function HeroScrollCanvas() {
           aria-hidden="true"
         />
 
-        {/* Debug HUD Overlay (?debug=1) */}
+        {/* Soft Orange Radial Glow Behind/Around Burger (rgba(244,123,32,.25)) */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-10"
+          style={{
+            background:
+              'radial-gradient(circle at 50% 50%, rgba(244, 123, 32, 0.25) 0%, rgba(232, 48, 42, 0.08) 42%, rgba(10, 10, 10, 0) 72%)',
+            mixBlendMode: 'screen',
+          }}
+        />
+
+        {/* Lightweight Floating Ember Particles */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
+          {EMBER_PARTICLES.map((ember, idx) => (
+            <span
+              key={idx}
+              className="animate-ember-float absolute rounded-full bg-primary shadow-[0_0_8px_rgba(244,123,32,0.9)]"
+              style={
+                {
+                  left: ember.left,
+                  bottom: ember.bottom,
+                  width: `${ember.size}px`,
+                  height: `${ember.size}px`,
+                  opacity: 0,
+                  '--ember-duration': ember.duration,
+                  '--ember-delay': ember.delay,
+                } as CSSProperties
+              }
+            />
+          ))}
+        </div>
+
+        {/* Desktop Left Text Contrast Scrim */}
+        {!isMobile && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[56%]"
+            style={{
+              background:
+                'linear-gradient(90deg, rgba(10,10,10,0.88) 0%, rgba(10,10,10,0.56) 62%, rgba(10,10,10,0) 100%)',
+            }}
+          />
+        )}
+
+        {/* Debug HUD (?debug=1) */}
         {isDebug && (
-          <div className="fixed top-20 left-4 z-50 rounded-lg border border-primary/50 bg-black/90 p-3 font-mono text-xs text-primary shadow-2xl backdrop-blur-md">
-            <p className="font-bold text-white border-b border-primary/30 pb-1 mb-1">
-              🛠️ DEBUG HERO SCROLL
+          <div className="fixed top-20 left-3 z-50 rounded-lg border border-primary/50 bg-black/90 p-3 font-mono text-xs text-primary shadow-2xl backdrop-blur-md">
+            <p className="mb-1 border-b border-primary/30 pb-1 font-bold text-white">
+              DEBUG HERO SCROLL
             </p>
-            <p>Progresso: <span className="text-white">{debugData.progress}</span></p>
-            <p>Frame: <span className="text-cheese">{debugData.currentFrame} / {TOTAL_FRAMES}</span> (Alvo: {debugData.targetFrame})</p>
-            <p>Carregados: <span className="text-whatsapp">{debugData.loadedCount}</span> | Falhas: <span className="text-accent">{debugData.failedCount}</span></p>
-            <p>Dispositivo: <span className="text-white">{debugData.isMobile ? 'Celular (Skipped Frames)' : 'Desktop/Tablet'}</span></p>
-            <p>Hero Rect Top: <span className="text-white">{debugData.rectTop}px</span></p>
+            <p>
+              Modo:{' '}
+              <span className="font-bold uppercase text-cheese">
+                {debugInfo.modeKey}
+              </span>{' '}
+              <span className="text-muted">
+                ({debugInfo.drawMode}, x{debugInfo.scale})
+              </span>
+            </p>
+            <p>
+              Pasta: <span className="text-white">{debugInfo.dir}</span>
+            </p>
+            <p>
+              Total: <span className="text-white">{debugInfo.total}</span>
+            </p>
+            <p>
+              Frame atual:{' '}
+              <span className="text-cheese">
+                {debugInfo.currentFrame} / {debugInfo.total}
+              </span>
+            </p>
+            <p>
+              Progresso: <span className="text-white">{debugInfo.progress}</span>
+            </p>
+            <p>
+              Carregados: <span className="text-whatsapp">{debugInfo.loaded}</span> | Erros:{' '}
+              <span className="text-accent">{debugInfo.errors}</span>
+            </p>
           </div>
         )}
 
-        {/* Preloader HUD Overlay */}
+        {/* Preloader Overlay */}
         {!isPreloaded && (
           <div
             role="status"
             aria-live="polite"
-            className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-[#0A0A0A] px-6 text-center"
+            className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-[#0A0A0A] px-6 pt-16 text-center sm:pt-20"
           >
-            <BrasaLogo size={80} className="ring-4 ring-primary/40 animate-pulse shadow-[0_0_35px_rgba(244,123,32,0.5)]" />
+            <BrasaLogo
+              size={80}
+              className="animate-pulse ring-4 ring-primary/40 shadow-[0_0_35px_rgba(244,123,32,0.5)]"
+            />
             <h2 className="mt-5 font-display text-3xl tracking-wider text-foreground uppercase sm:text-4xl">
               ACENDENDO A BRASA...
             </h2>
             <p className="mt-1 font-accent text-sm italic text-cheese">
-              Carregando o hambúrguer artesanal da BRASA BURGER
+              Carregando experiência BRASA BURGER
             </p>
 
             <div className="mt-6 w-full max-w-xs overflow-hidden rounded-full border border-white/20 bg-[#141414] p-1 shadow-inner">
@@ -341,129 +532,247 @@ export function HeroScrollCanvas() {
           </div>
         )}
 
-        {/* Hero Text Phase Overlays — Container Central max-w-[1200px] */}
-        <div className="overlay relative z-20 mx-auto flex h-full max-w-[1200px] flex-col justify-center px-5 pt-16 pb-20 sm:px-10 lg:px-16 pointer-events-none">
-          <div className="relative max-w-xl min-w-0 pointer-events-auto">
-            {/* PHASE 1: 0 - 25% */}
-            <div
-              className={`transition-all duration-500 ease-out ${
-                activePhase === 1
-                  ? 'opacity-100 translate-y-0 blur-0 relative z-10'
-                  : 'opacity-0 -translate-y-4 blur-[12px] absolute inset-x-0 top-0 pointer-events-none'
-              }`}
-            >
-              <p className="mb-2 font-accent text-sm italic tracking-wide text-cheese sm:text-base">
-                Desde 2025 · Caieiras-SP
-              </p>
-              <h1 className="font-display leading-[0.92] tracking-wide text-foreground uppercase text-[clamp(2.4rem,6.5vw,5rem)]">
-                O HAMBÚRGUER QUE <span className="text-primary">VOCÊ MERECE</span>
-              </h1>
-              <p className="mt-4 text-sm leading-relaxed text-muted sm:text-base">
-                Blend bovino artesanal de 150g grelhado na brasa quente, queijo derretido e pão brioche macio tostado na manteiga.
-              </p>
-              <div className="mt-6">
-                <a
-                  href="#destaques"
-                  className="inline-flex min-h-11 items-center justify-center rounded-control bg-primary px-6 font-display text-lg tracking-wider text-primary-foreground shadow-[0_8px_24px_-6px_rgba(244,123,32,0.65)] transition-transform duration-150 ease-out hover:-translate-y-0.5"
-                >
-                  PEDIR AGORA
-                </a>
+        {/* Text Phases Overlay */}
+        {isMobile ? (
+          /* MOBILE OVERLAY: Top zone right below fixed header + Bottom zone above fixed bar */
+          <div className="pointer-events-none relative z-20 mx-auto flex h-full max-w-[1200px] flex-col justify-between px-4 pt-[74px] pb-[92px]">
+            {/* TOP ZONE: Badge + Phase Title */}
+            <div className="pointer-events-auto relative w-full text-center">
+              <div className="mb-1.5 inline-flex items-center gap-1.5 rounded-full border border-cheese/40 bg-black/75 px-3 py-1 text-[11px] font-semibold text-cheese backdrop-blur-md">
+                <Flame className="h-3 w-3 text-primary" aria-hidden="true" />
+                <span>Caieiras-SP · Hamburgueria artesanal</span>
+              </div>
+
+              <div className="relative min-h-[5.5rem]">
+                {phaseIds.map((id) => {
+                  const phase = PHASE_COPY[id];
+                  const isActive = activePhase === id;
+                  const HeadingTag = id === 1 ? 'h1' : 'h2';
+                  return (
+                    <div
+                      key={id}
+                      className={`transition-all duration-500 ease-out ${
+                        isActive
+                          ? 'relative z-10 translate-y-0 opacity-100 blur-0'
+                          : 'pointer-events-none absolute inset-x-0 top-0 -translate-y-3 opacity-0 blur-[10px]'
+                      }`}
+                    >
+                      <HeadingTag className="font-display text-[clamp(30px,9vw,44px)] leading-[0.94] tracking-wide text-foreground uppercase drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
+                        {phase.titleStart}
+                        <span className={phase.highlightTone === 'primary' ? 'text-primary' : 'text-cheese'}>
+                          {phase.titleHighlight}
+                        </span>
+                      </HeadingTag>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* PHASE 2: 25 - 50% */}
-            <div
-              className={`transition-all duration-500 ease-out ${
-                activePhase === 2
-                  ? 'opacity-100 translate-y-0 blur-0 relative z-10'
-                  : 'opacity-0 -translate-y-4 blur-[12px] absolute inset-x-0 top-0 pointer-events-none'
-              }`}
-            >
-              <p className="mb-2 font-accent text-sm italic tracking-wide text-primary sm:text-base">
-                Sabor autêntico na brasa
-              </p>
-              <h2 className="font-display leading-[0.92] tracking-wide text-foreground uppercase text-[clamp(2.4rem,6.5vw,5rem)]">
-                BLEND ARTESANAL <span className="text-cheese">150G</span>
-              </h2>
-              <p className="mt-4 text-sm leading-relaxed text-muted sm:text-base">
-                150g de carne bovina selada na grelha bem quente com tempero especial da casa e suculência incomparável.
-              </p>
-            </div>
+            {/* BOTTOM ZONE: Phase Subtitle + 2 Buttons (Pedir & Ligar) cleared from bottom bar and WhatsApp FAB */}
+            <div className="pointer-events-auto relative mx-auto w-full max-w-[260px] text-center">
+              <div className="relative mb-3 min-h-[3.25rem]">
+                {phaseIds.map((id) => {
+                  const phase = PHASE_COPY[id];
+                  const isActive = activePhase === id;
+                  return (
+                    <p
+                      key={id}
+                      className={`text-xs leading-relaxed text-muted transition-all duration-500 ease-out ${
+                        isActive
+                          ? 'relative z-10 translate-y-0 opacity-100 blur-0'
+                          : 'pointer-events-none absolute inset-x-0 bottom-0 translate-y-3 opacity-0 blur-[8px]'
+                      }`}
+                    >
+                      {phase.subtitle}
+                    </p>
+                  );
+                })}
+              </div>
 
-            {/* PHASE 3: 50 - 75% */}
-            <div
-              className={`transition-all duration-500 ease-out ${
-                activePhase === 3
-                  ? 'opacity-100 translate-y-0 blur-0 relative z-10'
-                  : 'opacity-0 -translate-y-4 blur-[12px] absolute inset-x-0 top-0 pointer-events-none'
-              }`}
-            >
-              <p className="mb-2 font-accent text-sm italic tracking-wide text-cheese sm:text-base">
-                Crocância e maciez
-              </p>
-              <h2 className="font-display leading-[0.92] tracking-wide text-foreground uppercase text-[clamp(2.4rem,6.5vw,4.8rem)]">
-                PÃO BRIOCHE TOSTADO <span className="text-primary">NA MANTEIGA</span>
-              </h2>
-              <p className="mt-4 text-sm leading-relaxed text-muted sm:text-base">
-                Pão brioche macio, fofinho e dourado na chapa com manteiga de garrafa para selar todo o sabor.
-              </p>
-            </div>
-
-            {/* PHASE 4: 75 - 100% */}
-            <div
-              className={`transition-all duration-500 ease-out ${
-                activePhase === 4
-                  ? 'opacity-100 translate-y-0 blur-0 relative z-10'
-                  : 'opacity-0 -translate-y-4 blur-[12px] absolute inset-x-0 top-0 pointer-events-none'
-              }`}
-            >
-              <p className="mb-2 font-accent text-sm italic tracking-wide text-primary sm:text-base">
-                Diretamente para sua casa
-              </p>
-              <h2 className="font-display leading-[0.92] tracking-wide text-foreground uppercase text-[clamp(2.4rem,6.5vw,5rem)]">
-                FEITO NA HORA, <span className="text-cheese">ENTREGUE QUENTE</span>
-              </h2>
-              <p className="mt-4 text-sm leading-relaxed text-muted sm:text-base">
-                Entregas rápidas no bairro Laranjeiras e em toda Caieiras-SP. Peça agora pelo iFood ou WhatsApp!
-              </p>
-              <div className="mt-7 flex flex-wrap items-center gap-3.5">
+              <div className="flex items-center justify-center gap-2.5">
                 <a
-                  href={STORE_INFO.ifoodUrl}
+                  href={activePhase === 4 ? STORE_INFO.ifoodUrl : STORE_INFO.anotaAiUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-control bg-accent px-6 font-display text-xl tracking-wider text-accent-foreground shadow-[0_8px_24px_-6px_rgba(232,48,42,0.65)] transition-[transform,background-color] duration-150 ease-out hover:-translate-y-0.5 hover:bg-[#ff3b35] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  className="inline-flex min-h-11 flex-1 items-center justify-center whitespace-nowrap rounded-control bg-primary px-4 font-display text-lg tracking-wider text-primary-foreground shadow-[0_8px_22px_-6px_rgba(244,123,32,0.65)] transition-transform duration-150 hover:-translate-y-0.5"
                 >
-                  PEDIR NO IFOOD
+                  PEDIR
                 </a>
                 <a
-                  href={STORE_INFO.whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex min-h-12 items-center justify-center gap-2.5 whitespace-nowrap rounded-control bg-whatsapp px-6 font-display text-xl tracking-wider text-primary-foreground shadow-[0_8px_24px_-6px_rgba(37,211,102,0.45)] transition-[transform,background-color] duration-150 ease-out hover:-translate-y-0.5 hover:bg-[#20bd5a] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-whatsapp"
+                  href={STORE_INFO.phoneTel}
+                  className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-control border border-white/25 bg-surface/95 px-4 font-display text-lg tracking-wider text-foreground backdrop-blur-md transition-colors hover:border-primary"
                 >
-                  <MessageCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
-                  FALAR NO WHATSAPP
+                  <Phone className="h-4 w-4 text-primary" aria-hidden="true" />
+                  <span>LIGAR</span>
                 </a>
               </div>
             </div>
           </div>
-        </div>
+        ) : (
+          /* DESKTOP / TABLET OVERLAY (> 768px): Left Text Column + Right Floating Ingredient Cards */
+          <div className="pointer-events-none relative z-20 mx-auto flex h-full max-w-[1200px] items-center justify-between px-10 pt-20 pb-20 lg:px-16">
+            <div className="pointer-events-auto relative max-w-xl min-w-0">
+              {phaseIds.map((id) => {
+                const phase = PHASE_COPY[id];
+                const isActive = activePhase === id;
+                const HeadingTag = id === 1 ? 'h1' : 'h2';
+                const BadgeIcon =
+                  id === 1 ? Flame : id === 2 ? Sparkles : id === 3 ? ShieldCheck : Clock;
+                const badgeColor =
+                  id === 2
+                    ? 'border-primary/40 text-primary'
+                    : id === 4
+                      ? 'border-whatsapp/40 text-whatsapp'
+                      : 'border-cheese/40 text-cheese';
 
-        {/* Scroll Cue Indicator (fades out after 5% scroll) */}
-        <div
-          className={`absolute bottom-8 left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-1 text-xs font-semibold text-muted transition-opacity duration-300 ${
-            scrollRatio > 0.05 ? 'opacity-0 pointer-events-none' : 'opacity-100'
-          }`}
-        >
-          <span className="font-accent italic text-primary">Role para explorar</span>
-          <ChevronDown className="h-4 w-4 animate-bounce text-primary" aria-hidden="true" />
-        </div>
+                return (
+                  <div
+                    key={id}
+                    className={`transition-all duration-500 ease-out ${
+                      isActive
+                        ? 'relative z-10 translate-y-0 opacity-100 blur-0'
+                        : 'pointer-events-none absolute inset-x-0 top-0 -translate-y-4 opacity-0 blur-[12px]'
+                    }`}
+                  >
+                    <div
+                      className={`mb-3 inline-flex items-center gap-2 rounded-full border bg-black/65 px-3.5 py-1 text-xs font-semibold backdrop-blur-md ${badgeColor}`}
+                    >
+                      <BadgeIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                      <span>{phase.desktopBadge}</span>
+                    </div>
+
+                    <HeadingTag className="font-display text-[clamp(2.8rem,5.6vw,4.8rem)] leading-[0.92] tracking-wide text-foreground uppercase">
+                      {phase.titleStart}
+                      <span className={phase.highlightTone === 'primary' ? 'text-primary' : 'text-cheese'}>
+                        {phase.titleHighlight}
+                      </span>
+                    </HeadingTag>
+
+                    <p className="mt-4 text-base leading-relaxed text-muted">{phase.subtitle}</p>
+
+                    {id === 1 && (
+                      <div className="mt-6 flex items-center gap-3">
+                        <a
+                          href="#destaques"
+                          className="inline-flex min-h-11 items-center justify-center rounded-control bg-primary px-6 font-display text-lg tracking-wider text-primary-foreground shadow-[0_8px_24px_-6px_rgba(244,123,32,0.65)] transition-transform duration-150 ease-out hover:-translate-y-0.5"
+                        >
+                          PEDIR AGORA
+                        </a>
+                        <span className="text-xs font-medium text-muted/85">
+                          Role para explorar o lanche ↓
+                        </span>
+                      </div>
+                    )}
+
+                    {id === 4 && (
+                      <div className="mt-7 flex flex-wrap items-center gap-3.5">
+                        <a
+                          href={STORE_INFO.ifoodUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-control bg-accent px-6 font-display text-xl tracking-wider text-accent-foreground shadow-[0_8px_24px_-6px_rgba(232,48,42,0.65)] transition-[transform,background-color] duration-150 ease-out hover:-translate-y-0.5 hover:bg-[#ff3b35]"
+                        >
+                          PEDIR NO IFOOD
+                        </a>
+                        <a
+                          href={STORE_INFO.whatsappUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex min-h-12 items-center justify-center gap-2.5 whitespace-nowrap rounded-control bg-whatsapp px-6 font-display text-xl tracking-wider text-primary-foreground shadow-[0_8px_24px_-6px_rgba(37,211,102,0.45)] transition-[transform,background-color] duration-150 ease-out hover:-translate-y-0.5 hover:bg-[#20bd5a]"
+                        >
+                          <MessageCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
+                          FALAR NO WHATSAPP
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Right Floating Ingredient Cards (Desktop) */}
+            <div className="pointer-events-auto hidden max-w-xs flex-col gap-3.5 lg:flex">
+              <div
+                className={`transform rounded-card border border-primary/40 bg-black/85 p-4 shadow-[0_8px_24px_rgba(244,123,32,0.25)] backdrop-blur-md transition-all duration-500 ease-out ${
+                  activePhase >= 2
+                    ? 'translate-x-0 scale-100 opacity-100'
+                    : 'pointer-events-none translate-x-8 scale-90 opacity-0'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary">
+                    🥩
+                  </span>
+                  <div>
+                    <h4 className="font-display text-lg leading-tight text-white uppercase">
+                      Blend 150g na Brasa
+                    </h4>
+                    <p className="text-[11px] text-muted">Carne bovina com crosta selada e suculência</p>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className={`transform rounded-card border border-cheese/40 bg-black/85 p-4 shadow-[0_8px_24px_rgba(245,181,46,0.25)] backdrop-blur-md transition-all duration-500 delay-100 ease-out ${
+                  activePhase >= 2
+                    ? 'translate-x-0 scale-100 opacity-100'
+                    : 'pointer-events-none translate-x-8 scale-90 opacity-0'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cheese/20 text-cheese">
+                    🧀
+                  </span>
+                  <div>
+                    <h4 className="font-display text-lg leading-tight text-white uppercase">
+                      Queijo Prato Derretido
+                    </h4>
+                    <p className="text-[11px] text-muted">Massa cremosa cobrindo o hambúrguer</p>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className={`transform rounded-card border border-accent/40 bg-black/85 p-4 shadow-[0_8px_24px_rgba(232,48,42,0.25)] backdrop-blur-md transition-all duration-500 delay-150 ease-out ${
+                  activePhase >= 3
+                    ? 'translate-x-0 scale-100 opacity-100'
+                    : 'pointer-events-none translate-x-8 scale-90 opacity-0'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/20 text-accent">
+                    🍞
+                  </span>
+                  <div>
+                    <h4 className="font-display text-lg leading-tight text-white uppercase">
+                      Brioche Tostado
+                    </h4>
+                    <p className="text-[11px] text-muted">Dourado na manteiga de garrafa</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Scroll Cue Indicator (desktop/tablet, fades out after 5%) */}
+        {!isMobile && (
+          <div
+            className={`absolute bottom-8 left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-1 text-xs font-semibold text-muted transition-opacity duration-300 ${
+              scrollProgress > 0.05 ? 'pointer-events-none opacity-0' : 'opacity-100'
+            }`}
+          >
+            <span className="font-accent italic text-primary">Role para explorar</span>
+            <ChevronDown className="h-4 w-4 animate-bounce text-primary" aria-hidden="true" />
+          </div>
+        )}
 
         {/* Fine Orange Scroll Progress Bar */}
         <div className="absolute right-0 bottom-0 left-0 z-30 h-1 bg-white/10">
           <div
             className="h-full bg-gradient-to-r from-accent via-primary to-cheese transition-[width] duration-75 ease-out"
-            style={{ width: `${Math.min(100, Math.max(0, scrollRatio * 100))}%` }}
+            style={{ width: `${Math.min(100, Math.max(0, scrollProgress * 100))}%` }}
           />
         </div>
       </div>

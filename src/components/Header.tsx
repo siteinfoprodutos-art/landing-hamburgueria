@@ -55,13 +55,13 @@ export function Header() {
           ))}
         </nav>
 
-        {/* Actions: Primary CTA Button "PEDIR" + Mobile Hamburger */}
+        {/* Actions: Primary CTA Button "PEDIR" (desktop/tablet only; mobile uses bottom bar) + Mobile Hamburger */}
         <div className="flex shrink-0 items-center gap-3">
           <a
             href={STORE_INFO.anotaAiUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-control bg-primary px-5 font-display text-lg tracking-wider text-primary-foreground shadow-[0_4px_18px_-4px_rgba(244,123,32,0.6)] transition-[transform,background-color,box-shadow] duration-150 ease-out hover:-translate-y-0.5 hover:bg-[#ff8930] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            className="hidden md:inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-control bg-primary px-5 font-display text-lg tracking-wider text-primary-foreground shadow-[0_4px_18px_-4px_rgba(244,123,32,0.6)] transition-[transform,background-color,box-shadow] duration-150 ease-out hover:-translate-y-0.5 hover:bg-[#ff8930] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             PEDIR
           </a>

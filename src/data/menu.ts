@@ -55,7 +55,7 @@ export const HIGHLIGHT_ITEMS: BestsellerItem[] = [
     description:
       'Hambúrguer artesanal 150g no pão brioche tostado na manteiga, alface, tomate, queijo derretido, picles crocantes, cebola roxa, bacon e molho especial de maionese com alho.',
     startingPriceLabel: 'a partir de R$ 48',
-    imageSrc: '/src/assets/images/raju_gallery_burger_1_1794492089881.jpg',
+    imageSrc: '/images/raju_gallery_burger_1_1794492089881.jpg',
     tag: 'O Mais Pedido',
   },
   {
@@ -66,7 +66,7 @@ export const HIGHLIGHT_ITEMS: BestsellerItem[] = [
     description:
       'Tiras selecionadas de frango empanado super crocante no pão brioche, cebola roxa, alface americana fresca, tomate suculento e molho artesanal de mostarda e mel.',
     startingPriceLabel: 'a partir de R$ 46',
-    imageSrc: '/src/assets/images/raju_gallery_chicken_1794492091346.jpg',
+    imageSrc: '/images/raju_gallery_chicken_1794492091346.jpg',
     tag: 'Crocante Supremo',
   },
   {
@@ -77,7 +77,7 @@ export const HIGHLIGHT_ITEMS: BestsellerItem[] = [
     description:
       '2 hambúrgueres artesanais de 100g grelhados na chapa bem quente, camada dupla de queijo derretido, fatias generosas de bacon e molho barbecue defumado.',
     startingPriceLabel: 'a partir de R$ 55',
-    imageSrc: '/src/assets/images/raju_gallery_burger_2_1794492091634.jpg',
+    imageSrc: '/images/raju_gallery_burger_2_1794492091634.jpg',
     tag: 'Carne em Dobro',
   },
 ];
@@ -87,42 +87,42 @@ export const GALLERY_PHOTOS: GalleryPhoto[] = [
     id: 'gal-1',
     title: 'Brasa Classic na Brasa',
     category: 'Burguer Artesanal',
-    src: '/src/assets/images/raju_gallery_burger_1_1794492089881.jpg',
+    src: '/images/raju_gallery_burger_1_1794492089881.jpg',
     alt: 'Hambúrguer artesanal Brasa Classic com queijo derretido, bacon e maionese de alho',
   },
   {
     id: 'gal-2',
     title: 'Chapa Quente em Ação',
     category: 'Cozinha & Preparo',
-    src: '/src/assets/images/raju_story_kitchen_1794492089378.jpg',
+    src: '/images/raju_story_kitchen_1794492089378.jpg',
     alt: 'Chefe selando blend artesanal 150g na chapa quente da Brasa Burger',
   },
   {
     id: 'gal-3',
     title: 'Brasa Double Smash 200g',
     category: 'Burguer Artesanal',
-    src: '/src/assets/images/raju_gallery_burger_2_1794492091634.jpg',
+    src: '/images/raju_gallery_burger_2_1794492091634.jpg',
     alt: 'Hambúrguer duplo smash 200g com molho barbecue e bacon',
   },
   {
     id: 'gal-4',
     title: 'Chicken Crispy Strips',
     category: 'Especialidades',
-    src: '/src/assets/images/raju_gallery_chicken_1794492091346.jpg',
+    src: '/images/raju_gallery_chicken_1794492091346.jpg',
     alt: 'Sanduíche de frango empanado crocante no pão brioche',
   },
   {
     id: 'gal-5',
     title: 'Fritas com Queijo e Bacon',
     category: 'Porção Crocante',
-    src: '/src/assets/images/raju_gallery_fries_1794492090855.jpg',
+    src: '/images/raju_gallery_fries_1794492090855.jpg',
     alt: 'Porção de batatas fritas cobertas com queijo e cubos de bacon',
   },
   {
     id: 'gal-6',
     title: 'Ambiente Brasa Burger',
     category: 'Nosso Espaço',
-    src: '/src/assets/images/raju_gallery_ambiance_1794492091850.jpg',
+    src: '/images/raju_gallery_ambiance_1794492091850.jpg',
     alt: 'Ambiente aconchegante e iluminação quente da Brasa Burger em Caieiras-SP',
   },
 ];

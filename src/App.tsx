@@ -14,7 +14,9 @@ export default function App() {
         <Header />
         <main>
           <HeroScrollCanvas />
-          <BurgerSections />
+          <div className="overflow-x-clip">
+            <BurgerSections />
+          </div>
         </main>
       </div>
     </MotionConfig>

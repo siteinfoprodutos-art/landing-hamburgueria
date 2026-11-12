@@ -152,7 +152,7 @@ export function BurgerSections() {
             >
               <div className="relative overflow-hidden rounded-card border border-white/15 bg-surface shadow-[0_20px_50px_-15px_rgba(244,123,32,0.3)]">
                 <img
-                  src="/src/assets/images/raju_story_kitchen_1794492089378.jpg"
+                  src="/images/raju_story_kitchen_1794492089378.jpg"
                   alt="Chefe preparando blend artesanal na chapa da BRASA BURGER"
                   width={600}
                   height={450}
@@ -767,7 +767,7 @@ export function BurgerSections() {
       </footer>
 
       {/* 5. BOTÃO DE WHATSAPP PISCANDO / PULSANDO + BALÃO DE CHAT */}
-      <div className="fixed right-5 bottom-20 z-40 flex flex-col items-end md:right-8 md:bottom-8">
+      <div className="fixed right-3.5 bottom-[86px] z-40 flex flex-col items-end md:right-8 md:bottom-8">
         {/* Balão de Fala "Fale com a Brasa" */}
         <AnimatePresence>
           {showWaTooltip && (
@@ -800,9 +800,9 @@ export function BurgerSections() {
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Falar com a BRASA BURGER pelo WhatsApp"
-            className="animate-wa-wiggle relative inline-flex h-14 w-14 items-center justify-center rounded-full bg-whatsapp text-primary-foreground shadow-[0_8px_25px_rgba(37,211,102,0.55)] transition-transform duration-200 hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-whatsapp"
+            className="animate-wa-wiggle relative inline-flex h-12 w-12 items-center justify-center rounded-full bg-whatsapp text-primary-foreground shadow-[0_8px_25px_rgba(37,211,102,0.55)] transition-transform duration-200 hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-whatsapp md:h-14 md:w-14"
           >
-            <MessageCircle className="h-7 w-7" aria-hidden="true" />
+            <MessageCircle className="h-6 w-6 md:h-7 md:w-7" aria-hidden="true" />
           </a>
         </div>
       </div>

@@ -30,12 +30,33 @@ html {
   scroll-behavior: smooth;
 }
 
-/* CRITICAL: Never set overflow: hidden or overflow-x: hidden on body, html, or parent wrappers as it breaks position: sticky! */
+/* CRITICAL: Never set overflow, transform, or filter on html, body, or #hero ancestors as it breaks position: sticky! */
 body {
   font-family: var(--font-sans);
   background-color: #0A0A0A;
   color: #FFFFFF;
-  overflow-x: clip;
+}
+
+@keyframes emberFloat {
+  0% {
+    transform: translateY(0) translateX(0) scale(0.8);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.75;
+  }
+  80% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateY(-130px) translateX(14px) scale(0.3);
+    opacity: 0;
+  }
+}
+
+.animate-ember-float {
+  animation: emberFloat var(--ember-duration, 6s) ease-out infinite;
+  animation-delay: var(--ember-delay, 0s);
 }
 
 /* Cartographic SVG label halo per engineering specification */
