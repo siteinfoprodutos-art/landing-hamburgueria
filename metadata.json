@@ -1,6 +1,6 @@
 {
-  "name": "Raju Burguer — Hamburgueria Artesanal",
-  "description": "Hamburgueria artesanal desde 2025 em Laranjeiras, Caieiras-SP. Blend artesanal 150g no pão brioche, combos, porções e delivery rápido.",
+  "name": "BRASA BURGER — Hamburgueria Artesanal",
+  "description": "Hamburgueria artesanal desde 2025 em Caieiras-SP. Blend artesanal 150g no pão brioche, combos, porções e delivery rápido.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

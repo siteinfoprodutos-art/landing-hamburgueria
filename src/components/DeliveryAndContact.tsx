@@ -1,6 +1,6 @@
 import { ExternalLink, Instagram, MapPin, MessageCircle, Navigation, Phone, ShoppingBag } from 'lucide-react';
 import { STORE_INFO } from '../data/menu';
-import { CaieirasLocatorMapSvg, DeliveryScooterSvg, RajuLogo } from './BurgerArtwork';
+import { CaieirasLocatorMapSvg, DeliveryScooterSvg, BrasaLogo } from './BurgerArtwork';
 
 interface DeliveryAndContactProps {
   cartCount: number;
@@ -28,7 +28,7 @@ export function DeliveryAndContact({ cartCount, onOpenCart }: DeliveryAndContact
               FAMINTO? A GENTE ENTREGA!
             </h2>
             <p className="mt-3 max-w-[36em] text-sm font-medium text-background/85 sm:text-base">
-              Seu hambúrguer sai da chapa direto para a bag térmica. Peça pelo nosso site oficial ou pelo iFood com poucos toques.
+              Seu hambúrguer sai da brasa direto para a bag térmica. Peça pelo nosso site oficial ou pelo iFood com poucos toques.
             </p>
 
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
@@ -80,7 +80,7 @@ export function DeliveryAndContact({ cartCount, onOpenCart }: DeliveryAndContact
                 CONTATO &amp; <span className="text-primary">ENDEREÇO</span>
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-muted sm:text-base">
-                Estamos no coração das Laranjeiras, em Caieiras-SP, preparando hambúrgueres artesanais desde 2025.
+                Estamos em Caieiras-SP, preparando hambúrgueres artesanais na brasa desde 2025.
               </p>
 
               <dl className="mt-7 divide-y divide-white/10 border-y border-white/10">
@@ -166,13 +166,13 @@ export function DeliveryAndContact({ cartCount, onOpenCart }: DeliveryAndContact
         <div className="mx-auto max-w-[90rem] px-4 sm:px-8">
           <div className="flex flex-col justify-between gap-8 border-b border-white/10 pb-8 md:flex-row md:items-center">
             <div className="flex items-center gap-3.5">
-              <RajuLogo size={52} className="ring-2 ring-primary/40" />
+              <BrasaLogo size={52} className="ring-2 ring-primary/40" />
               <div>
                 <p className="font-display text-2xl tracking-wider text-foreground uppercase">
-                  RAJU <span className="text-primary">BURGUER</span>
+                  BRASA <span className="text-primary">BURGER</span>
                 </p>
                 <p className="text-xs text-muted">
-                  Hamburgueria artesanal desde 2025 · Laranjeiras, Caieiras-SP
+                  Hamburgueria artesanal desde 2025 · Caieiras-SP
                 </p>
               </div>
             </div>
@@ -181,20 +181,11 @@ export function DeliveryAndContact({ cartCount, onOpenCart }: DeliveryAndContact
               <a href="#inicio" className="whitespace-nowrap text-foreground/90 transition-colors hover:text-primary">
                 Início
               </a>
-              <a href="#cardapio" className="whitespace-nowrap text-foreground/90 transition-colors hover:text-primary">
-                Cardápio
+              <a href="#sobre" className="whitespace-nowrap text-foreground/90 transition-colors hover:text-primary">
+                Sobre
               </a>
-              <a href="#mais-vendidos" className="whitespace-nowrap text-foreground/90 transition-colors hover:text-primary">
-                Combos
-              </a>
-              <a href="#kids" className="whitespace-nowrap text-foreground/90 transition-colors hover:text-primary">
-                Kids
-              </a>
-              <a href="#aperitivos" className="whitespace-nowrap text-foreground/90 transition-colors hover:text-primary">
-                Aperitivos
-              </a>
-              <a href="#delivery" className="whitespace-nowrap text-foreground/90 transition-colors hover:text-primary">
-                Delivery
+              <a href="#destaques" className="whitespace-nowrap text-foreground/90 transition-colors hover:text-primary">
+                Destaques
               </a>
               <a href="#contato" className="whitespace-nowrap text-foreground/90 transition-colors hover:text-primary">
                 Contato
@@ -203,7 +194,7 @@ export function DeliveryAndContact({ cartCount, onOpenCart }: DeliveryAndContact
           </div>
 
           <div className="mt-6 flex flex-col justify-between gap-2 text-xs sm:flex-row sm:items-center">
-            <p>© 2026 Raju Burguer. Todos os direitos reservados.</p>
+            <p>© 2026 BRASA BURGER. Todos os direitos reservados.</p>
             <p>
               Av. Pauliceia, Laranjeiras, Caieiras-SP · Tel: {STORE_INFO.phoneDisplay}
             </p>
@@ -216,7 +207,7 @@ export function DeliveryAndContact({ cartCount, onOpenCart }: DeliveryAndContact
         href={STORE_INFO.whatsappUrl}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label="Falar com a Raju Burguer pelo WhatsApp"
+        aria-label="Falar com a BRASA BURGER pelo WhatsApp"
         className="fixed right-4 bottom-21 z-40 inline-flex h-14 w-14 items-center justify-center rounded-full bg-whatsapp text-primary-foreground shadow-[0_8px_24px_rgba(37,211,102,0.45)] transition-transform duration-150 ease-out hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-whatsapp md:right-6 md:bottom-6"
       >
         <MessageCircle className="h-7 w-7" aria-hidden="true" />

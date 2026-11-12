@@ -18,7 +18,7 @@ class RootErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('Erro na interface Raju Burguer:', error, info);
+    console.error('Erro na interface BRASA BURGER:', error, info);
   }
 
   render() {
@@ -32,7 +32,7 @@ class RootErrorBoundary extends Component<
             Algo saiu do esperado
           </h1>
           <p className="mt-2 max-w-md text-sm text-[#B8B8B8]">
-            Recarregue a página para voltar ao cardápio da Raju Burguer.
+            Recarregue a página para voltar ao cardápio da BRASA BURGER.
           </p>
           <button
             type="button"

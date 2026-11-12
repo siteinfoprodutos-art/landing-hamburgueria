@@ -27,12 +27,15 @@ html {
   font-synthesis-weight: none;
   background-color: #0A0A0A;
   color: #FFFFFF;
+  scroll-behavior: smooth;
 }
 
+/* CRITICAL: Never set overflow: hidden or overflow-x: hidden on body, html, or parent wrappers as it breaks position: sticky! */
 body {
   font-family: var(--font-sans);
   background-color: #0A0A0A;
   color: #FFFFFF;
+  overflow-x: clip;
 }
 
 /* Cartographic SVG label halo per engineering specification */
@@ -47,10 +50,99 @@ body {
 .burger-ember-glow {
   background: radial-gradient(
     circle at 50% 58%,
-    rgba(244, 123, 32, 0.24) 0%,
-    rgba(232, 48, 42, 0.09) 42%,
-    rgba(20, 20, 20, 0) 74%
+    rgba(244, 123, 32, 0.26) 0%,
+    rgba(232, 48, 42, 0.1) 45%,
+    rgba(20, 20, 20, 0) 75%
   );
+}
+
+/* Cinematic Film Grain Noise Overlay */
+.film-grain-overlay {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+/* Dark Vignette Overlay across screen edges */
+.vignette-overlay {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0) 50%,
+    rgba(0, 0, 0, 0.75) 100%
+  );
+  pointer-events: none;
+}
+
+/* Light Leak Animation traversing Hero */
+@keyframes lightLeakSweep {
+  0% {
+    transform: translate(-100%, -40%) rotate(-25deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.18;
+  }
+  50% {
+    transform: translate(80%, 40%) rotate(-25deg);
+    opacity: 0.28;
+  }
+  80% {
+    opacity: 0.15;
+  }
+  100% {
+    transform: translate(200%, 100%) rotate(-25deg);
+    opacity: 0;
+  }
+}
+
+.animate-light-leak {
+  animation: lightLeakSweep 14s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* WhatsApp Pulsing Ring Animation (every 1.8s) */
+@keyframes waPulseRing {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  70% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+}
+
+.animate-wa-pulse {
+  animation: waPulseRing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* WhatsApp Gentle Wiggle Animation (every 6s) */
+@keyframes waWiggle {
+  0%, 88%, 100% {
+    transform: rotate(0deg) scale(1);
+  }
+  90% {
+    transform: rotate(-12deg) scale(1.08);
+  }
+  92% {
+    transform: rotate(12deg) scale(1.08);
+  }
+  94% {
+    transform: rotate(-8deg) scale(1.05);
+  }
+  96% {
+    transform: rotate(8deg) scale(1.05);
+  }
+  98% {
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+.animate-wa-wiggle {
+  animation: waWiggle 6s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -61,5 +153,10 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  .animate-light-leak,
+  .animate-wa-pulse,
+  .animate-wa-wiggle {
+    animation: none !important;
   }
 }
