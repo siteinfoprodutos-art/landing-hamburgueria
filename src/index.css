@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0A0A0A;
+  --color-surface: #141414;
+  --color-surface-elevated: #1C1C1C;
+  --color-foreground: #FFFFFF;
+  --color-muted: #B8B8B8;
+  --color-primary: #F47B20;
+  --color-primary-foreground: #0A0A0A;
+  --color-accent: #E8302A;
+  --color-accent-foreground: #FFFFFF;
+  --color-cheese: #F5B52E;
+  --color-whatsapp: #25D366;
+  --color-border: rgba(244, 123, 32, 0.28);
+  --color-border-subtle: rgba(255, 255, 255, 0.1);
+
+  --font-display: "Bebas Neue", Impact, sans-serif;
+  --font-accent: "Alfa Slab One", Georgia, serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+
+  --radius-card: 1rem;
+  --radius-control: 0.625rem;
+}
+
+html {
+  font-synthesis-weight: none;
+  background-color: #0A0A0A;
+  color: #FFFFFF;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #0A0A0A;
+  color: #FFFFFF;
+}
+
+/* Cartographic SVG label halo per engineering specification */
+.map-label-halo {
+  paint-order: stroke;
+  stroke: #141414;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+/* Subtle ember radial ambience behind featured burgers */
+.burger-ember-glow {
+  background: radial-gradient(
+    circle at 50% 58%,
+    rgba(244, 123, 32, 0.24) 0%,
+    rgba(232, 48, 42, 0.09) 42%,
+    rgba(20, 20, 20, 0) 74%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *:not(.animate-spin):not(.animate-pulse),
+  *:not(.animate-spin):not(.animate-pulse)::before,
+  *:not(.animate-spin):not(.animate-pulse)::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
