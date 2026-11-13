@@ -3,22 +3,27 @@ import { ChevronDown, Clock, Flame, MessageCircle, Phone, ShieldCheck, Sparkles 
 import { STORE_INFO } from '../data/menu';
 import { BrasaLogo } from './BurgerArtwork';
 
-const CFG = {
+type DrawMode = 'cover' | 'fit' | 'fit-height';
+
+const CFG: {
+  desktop: { key: 'desktop'; dir: string; total: number; mode: DrawMode; scale: number };
+  mobile: { key: 'mobile'; dir: string; total: number; mode: DrawMode; scale: number };
+} = {
   desktop: {
-    key: 'desktop' as const,
+    key: 'desktop',
     dir: '/frames/',
     total: 95,
-    mode: 'cover' as const,
-    scale: 1,
+    mode: 'fit-height',
+    scale: 0.8, // 0.7 menor, 0.9 maior
   },
   mobile: {
-    key: 'mobile' as const,
+    key: 'mobile',
     dir: '/frames_mobile/',
     total: 72,
-    mode: 'fit' as const,
+    mode: 'fit',
     scale: 1.4,
   },
-} as const;
+};
 
 type HeroCfg = (typeof CFG)[keyof typeof CFG];
 type PhaseId = 1 | 2 | 3 | 4;
@@ -194,6 +199,22 @@ export function HeroScrollCanvas() {
 
       const iw = img.naturalWidth;
       const ih = img.naturalHeight;
+
+      if (cfg.mode === 'fit-height') {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const headerEl = document.querySelector('header');
+        const headerHeight = (headerEl ? headerEl.getBoundingClientRect().height : 80) * dpr;
+        const s = (ch / ih) * cfg.scale;
+        const w = iw * s;
+        const h = ih * s;
+        const x = (cw - w) / 2;
+        const y = (ch - h) / 2 + headerHeight * 0.5;
+        ctx.fillStyle = '#0A0A0A';
+        ctx.fillRect(0, 0, cw, ch);
+        ctx.drawImage(img, x, y, w, h);
+        return;
+      }
+
       const s =
         cfg.mode === 'cover'
           ? Math.max(cw / iw, ch / ih)
@@ -421,13 +442,14 @@ export function HeroScrollCanvas() {
           aria-hidden="true"
         />
 
-        {/* Soft Orange Radial Glow Behind/Around Burger (rgba(244,123,32,.25)) */}
+        {/* Soft Orange Radial Glow Behind/Around Burger */}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 z-10"
           style={{
-            background:
-              'radial-gradient(circle at 50% 50%, rgba(244, 123, 32, 0.25) 0%, rgba(232, 48, 42, 0.08) 42%, rgba(10, 10, 10, 0) 72%)',
+            background: isMobile
+              ? 'radial-gradient(circle at 50% 50%, rgba(244, 123, 32, 0.25) 0%, rgba(232, 48, 42, 0.08) 42%, rgba(10, 10, 10, 0) 72%)'
+              : 'radial-gradient(circle at 50% 54%, rgba(244, 123, 32, 0.18) 0%, rgba(232, 48, 42, 0.05) 42%, rgba(10, 10, 10, 0) 70%)',
             mixBlendMode: 'screen',
           }}
         />
@@ -453,14 +475,16 @@ export function HeroScrollCanvas() {
           ))}
         </div>
 
-        {/* Desktop Left Text Contrast Scrim */}
+        {/* Desktop Seamless Edge Overlay (#0A0A0A lateral + vertical fades hiding frame borders) */}
         {!isMobile && (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[56%]"
+            className="pointer-events-none absolute inset-0 z-10"
             style={{
-              background:
-                'linear-gradient(90deg, rgba(10,10,10,0.88) 0%, rgba(10,10,10,0.56) 62%, rgba(10,10,10,0) 100%)',
+              background: [
+                'linear-gradient(90deg, #0A0A0A 0%, rgba(10,10,10,0.92) 12%, rgba(10,10,10,0.52) 24%, rgba(10,10,10,0) 35%, rgba(10,10,10,0) 65%, rgba(10,10,10,0.52) 76%, rgba(10,10,10,0.92) 88%, #0A0A0A 100%)',
+                'linear-gradient(180deg, rgba(10,10,10,0.72) 0%, rgba(10,10,10,0) 14%, rgba(10,10,10,0) 86%, rgba(10,10,10,0.78) 100%)',
+              ].join(', '),
             }}
           />
         )}
@@ -610,9 +634,9 @@ export function HeroScrollCanvas() {
             </div>
           </div>
         ) : (
-          /* DESKTOP / TABLET OVERLAY (> 768px): Left Text Column + Right Floating Ingredient Cards */
-          <div className="pointer-events-none relative z-20 mx-auto flex h-full max-w-[1200px] items-center justify-between px-10 pt-20 pb-20 lg:px-16">
-            <div className="pointer-events-auto relative max-w-xl min-w-0">
+          /* DESKTOP / TABLET OVERLAY (> 768px): Side-aligned Text Column + Right Floating Cards without covering centered burger */
+          <div className="pointer-events-none relative z-20 mx-auto flex h-full max-w-[1440px] items-center justify-between px-8 pt-24 pb-20 lg:px-12 xl:px-16">
+            <div className="pointer-events-auto relative max-w-[340px] min-w-0 lg:max-w-[380px] xl:max-w-[420px]">
               {phaseIds.map((id) => {
                 const phase = PHASE_COPY[id];
                 const isActive = activePhase === id;
