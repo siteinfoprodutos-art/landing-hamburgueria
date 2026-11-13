@@ -3,7 +3,7 @@ import { ChevronDown, Clock, Flame, MessageCircle, Phone, ShieldCheck, Sparkles 
 import { STORE_INFO } from '../data/menu';
 import { BrasaLogo } from './BurgerArtwork';
 
-type DrawMode = 'cover' | 'fit' | 'fit-height';
+type DrawMode = 'cover' | 'fit';
 
 const CFG: {
   desktop: { key: 'desktop'; dir: string; total: number; mode: DrawMode; scale: number };
@@ -13,8 +13,8 @@ const CFG: {
     key: 'desktop',
     dir: '/frames/',
     total: 95,
-    mode: 'fit-height',
-    scale: 0.8, // 0.7 menor, 0.9 maior
+    mode: 'cover',
+    scale: 0.85, // 0.75 menor, 0.95 maior
   },
   mobile: {
     key: 'mobile',
@@ -38,6 +38,11 @@ interface DebugSnapshot {
   progress: number;
   loaded: number;
   errors: number;
+  iw: number;
+  ih: number;
+  cw: number;
+  ch: number;
+  drawScale: number;
 }
 
 const EMBER_PARTICLES = [
@@ -132,6 +137,11 @@ export function HeroScrollCanvas() {
       progress: 0,
       loaded: 0,
       errors: 0,
+      iw: 0,
+      ih: 0,
+      cw: 0,
+      ch: 0,
+      drawScale: 0,
     };
   });
 
@@ -162,6 +172,12 @@ export function HeroScrollCanvas() {
     let rafId = 0;
     let disposed = false;
 
+    let debugIw = 0;
+    let debugIh = 0;
+    let debugCw = 0;
+    let debugCh = 0;
+    let debugDrawScale = 0;
+
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     function getProgress(): number {
@@ -175,6 +191,9 @@ export function HeroScrollCanvas() {
       const cw = canvas.width;
       const ch = canvas.height;
       if (cw <= 0 || ch <= 0) return;
+
+      debugCw = cw;
+      debugCh = ch;
 
       ctx.fillStyle = '#0A0A0A';
       ctx.fillRect(0, 0, cw, ch);
@@ -199,34 +218,31 @@ export function HeroScrollCanvas() {
 
       const iw = img.naturalWidth;
       const ih = img.naturalHeight;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const headerEl = document.querySelector('header');
+      const headerHeight = (headerEl ? headerEl.getBoundingClientRect().height : 80) * dpr;
 
-      if (cfg.mode === 'fit-height') {
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        const headerEl = document.querySelector('header');
-        const headerHeight = (headerEl ? headerEl.getBoundingClientRect().height : 80) * dpr;
-        const s = (ch / ih) * cfg.scale;
-        const w = iw * s;
-        const h = ih * s;
-        const x = (cw - w) / 2;
-        const y = (ch - h) / 2 + headerHeight * 0.5;
-        ctx.fillStyle = '#0A0A0A';
-        ctx.fillRect(0, 0, cw, ch);
-        ctx.drawImage(img, x, y, w, h);
-        return;
+      let s: number;
+      if (cfg.mode === 'cover') {
+        s = Math.max(cw / iw, ch / ih) * cfg.scale; // desktop
+      } else {
+        s = (cw / iw) * cfg.scale; // mobile (fit)
       }
 
-      const s =
-        cfg.mode === 'cover'
-          ? Math.max(cw / iw, ch / ih)
-          : (cw / iw) * cfg.scale;
       const w = iw * s;
       const h = ih * s;
       const x = (cw - w) / 2;
-      const y = cfg.mode === 'cover' ? (ch - h) / 2 : ch * 0.5 - h / 2;
+      const y = cfg.mode === 'cover' ? (ch - h) / 2 + headerHeight * 0.4 : ch * 0.5 - h / 2;
 
-      ctx.drawImage(img, x, y, w, h);
+      debugIw = iw;
+      debugIh = ih;
+      debugDrawScale = s;
 
-      // Soft top/bottom edge melt in fit mode so the 16:9 frame blends smoothly into #0A0A0A
+      ctx.fillStyle = '#0A0A0A';
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.drawImage(img, 0, 0, iw, ih, x, y, w, h);
+
+      // Soft top/bottom edge melt in fit mode (mobile) so the 16:9 frame blends smoothly into #0A0A0A
       if (cfg.mode === 'fit') {
         const fade = Math.max(20, Math.round(h * 0.14));
         const topFade = ctx.createLinearGradient(0, y, 0, y + fade);
@@ -377,6 +393,11 @@ export function HeroScrollCanvas() {
           progress: Number(p.toFixed(3)),
           loaded: loadedCount,
           errors: errorCount,
+          iw: debugIw,
+          ih: debugIh,
+          cw: debugCw,
+          ch: debugCh,
+          drawScale: Number(debugDrawScale.toFixed(4)),
         });
       }
 
@@ -393,6 +414,11 @@ export function HeroScrollCanvas() {
       resizeCanvas();
     };
 
+    const ro = new ResizeObserver(() => {
+      resizeCanvas();
+    });
+    ro.observe(canvas);
+
     resizeCanvas();
     loadSequence(cfg);
     updateTexts(getProgress());
@@ -406,6 +432,7 @@ export function HeroScrollCanvas() {
       disposed = true;
       cancelAnimationFrame(rafId);
       if (safetyTimer) clearTimeout(safetyTimer);
+      ro.disconnect();
       mq.removeEventListener('change', handleMediaChange);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('orientationchange', handleResize);
@@ -434,25 +461,50 @@ export function HeroScrollCanvas() {
           background: '#0A0A0A',
         }}
       >
-        {/* Scroll Canvas */}
+        {/* Desktop Orange Radial Glow BEHIND canvas (rgba(244,123,32,.18)) */}
+        {!isMobile && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 z-0"
+            style={{
+              background:
+                'radial-gradient(circle at 50% 54%, rgba(244, 123, 32, 0.18) 0%, rgba(232, 48, 42, 0.05) 42%, rgba(10, 10, 10, 0) 72%)',
+            }}
+          />
+        )}
+
+        {/* Scroll Canvas (desktop uses radial mask-image so frame borders vanish into #0A0A0A) */}
         <canvas
           id="heroCanvas"
           ref={canvasRef}
-          style={{ width: '100%', height: '100%', display: 'block' }}
+          className="relative z-[5]"
+          style={
+            isMobile
+              ? { width: '100%', height: '100%', display: 'block' }
+              : {
+                  width: '100%',
+                  height: '100%',
+                  display: 'block',
+                  maskImage: 'radial-gradient(ellipse 75% 80% at 50% 50%, #000 55%, transparent 100%)',
+                  WebkitMaskImage:
+                    'radial-gradient(ellipse 75% 80% at 50% 50%, #000 55%, transparent 100%)',
+                }
+          }
           aria-hidden="true"
         />
 
-        {/* Soft Orange Radial Glow Behind/Around Burger */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-10"
-          style={{
-            background: isMobile
-              ? 'radial-gradient(circle at 50% 50%, rgba(244, 123, 32, 0.25) 0%, rgba(232, 48, 42, 0.08) 42%, rgba(10, 10, 10, 0) 72%)'
-              : 'radial-gradient(circle at 50% 54%, rgba(244, 123, 32, 0.18) 0%, rgba(232, 48, 42, 0.05) 42%, rgba(10, 10, 10, 0) 70%)',
-            mixBlendMode: 'screen',
-          }}
-        />
+        {/* Mobile Soft Orange Radial Glow Behind/Around Burger (rgba(244,123,32,.25)) */}
+        {isMobile && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 z-10"
+            style={{
+              background:
+                'radial-gradient(circle at 50% 50%, rgba(244, 123, 32, 0.25) 0%, rgba(232, 48, 42, 0.08) 42%, rgba(10, 10, 10, 0) 72%)',
+              mixBlendMode: 'screen',
+            }}
+          />
+        )}
 
         {/* Lightweight Floating Ember Particles */}
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
@@ -475,16 +527,14 @@ export function HeroScrollCanvas() {
           ))}
         </div>
 
-        {/* Desktop Seamless Edge Overlay (#0A0A0A lateral + vertical fades hiding frame borders) */}
+        {/* Subtle Left Text Contrast Scrim on Desktop */}
         {!isMobile && (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 z-10"
+            className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[40%]"
             style={{
-              background: [
-                'linear-gradient(90deg, #0A0A0A 0%, rgba(10,10,10,0.92) 12%, rgba(10,10,10,0.52) 24%, rgba(10,10,10,0) 35%, rgba(10,10,10,0) 65%, rgba(10,10,10,0.52) 76%, rgba(10,10,10,0.92) 88%, #0A0A0A 100%)',
-                'linear-gradient(180deg, rgba(10,10,10,0.72) 0%, rgba(10,10,10,0) 14%, rgba(10,10,10,0) 86%, rgba(10,10,10,0.78) 100%)',
-              ].join(', '),
+              background:
+                'linear-gradient(90deg, rgba(10,10,10,0.8) 0%, rgba(10,10,10,0.42) 55%, rgba(10,10,10,0) 100%)',
             }}
           />
         )}
@@ -518,6 +568,21 @@ export function HeroScrollCanvas() {
             </p>
             <p>
               Progresso: <span className="text-white">{debugInfo.progress}</span>
+            </p>
+            <p>
+              Frame (iw×ih):{' '}
+              <span className="text-white">
+                {debugInfo.iw}×{debugInfo.ih}
+              </span>
+            </p>
+            <p>
+              Canvas (cw×ch):{' '}
+              <span className="text-white">
+                {debugInfo.cw}×{debugInfo.ch}
+              </span>
+            </p>
+            <p>
+              Escala (s): <span className="text-cheese">{debugInfo.drawScale}</span>
             </p>
             <p>
               Carregados: <span className="text-whatsapp">{debugInfo.loaded}</span> | Erros:{' '}
